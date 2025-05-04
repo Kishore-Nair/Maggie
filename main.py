@@ -6,29 +6,53 @@ import sys
 import time
 import re
 import psutil
-import random
-import os
-import requests
-
 from feature.customvoice import speak
 from feature.llama_for_Maggie import handle_convo
 
-def take_command():
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        r.pause_threshold = 0.6
-        print("🎙️ Listening...")
-        audio = r.listen(source)
+# Mode flag: True for type mode, False for voice mode
+type_mode = False
 
-        try:
-            query = r.recognize_google(audio, language='en-in')
-            print(f"🗣️ User said: {query}")
-            return query.lower()
-        except sr.UnknownValueError:
-            speak("Sorry, I didn't catch that.")
-        except sr.RequestError as e:
-            speak(f"Google service error: {e}")
-        return ""
+def respond(text):
+    """Speak or print based on mode."""
+    if type_mode:
+        print(f"🤖 Maggi: {text}")
+    else:
+        speak(text)
+
+def choose_mode():
+    global type_mode
+    print("Choose your mode:")
+    print("1. Voice mode")
+    print("2. Type mode")
+    choice = input("Enter 1 or 2: ").strip()
+
+    if choice == "2":
+        type_mode = True
+        respond("Switched to type mode. You can now type your commands.")
+    else:
+        type_mode = False
+        respond("Switched to voice mode. You can now speak your commands.")
+
+def take_command():
+    global type_mode
+    if type_mode:
+        return input("⌨️ You: ").lower()
+    else:
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            r.pause_threshold = 0.6
+            print("🎙️ Listening...")
+            audio = r.listen(source)
+
+            try:
+                query = r.recognize_google(audio, language='en-in')
+                print(f"🗣️ You said: {query}")
+                return query.lower()
+            except sr.UnknownValueError:
+                respond("Sorry, I didn't catch that.")
+            except sr.RequestError as e:
+                respond(f"Google service error: {e}")
+            return ""
 
 def open_website(query):
     websites = {
@@ -51,7 +75,7 @@ def open_website(query):
 
     for name, url in websites.items():
         if f"open {name}" in query:
-            speak(f"Opening {name}")
+            respond(f"Opening {name}")
             webbrowser.open(url)
             return True
     return False
@@ -77,148 +101,124 @@ def open_application(query):
 
     for name, path in apps.items():
         if f"open {name}" in query:
-            speak(f"Opening {name}")
+            respond(f"Opening {name}")
             opener = "open" if sys.platform == "darwin" else "xdg-open"
             try:
                 subprocess.call([opener, f"/System/Applications/{path}"])
             except Exception:
-                speak(f"Couldn't open {name}.")
+                respond(f"Couldn't open {name}.")
             return True
     return False
 
 def handle_ai_mode():
-    speak("Done! How may I help you?")
+    respond("AI mode activated. How may I help you?")
     while True:
+        print("🧠 LLaMA is listening...")
         query = take_command()
-        if "exit llama" in query:
-            speak(handle_convo("bye"))
+        if "exit llama" in query or "exit ai" in query or  "bye" in query :
+            respond(handle_convo("bye"))
             break
         if query:
-            response = handle_convo(query)
-            speak(response)
+            result = handle_convo(query)
+            respond(result)
 
 def google_search(query):
-    search_term = re.sub(r"(search|on google|in google)", "", query).strip()
-    if search_term:
-        speak(f"Searching Google for {search_term}")
-        webbrowser.open(f"https://www.google.com/search?q={search_term}")
-    else:
-        speak("What should I search for?")
+    if "search" in query and "google" in query:
+        search_term = query.split("search")[-1]
+        search_term = re.sub(r"\bon google\b|\bin google\b", "", search_term).strip()
+        if search_term:
+            respond(f"Searching Google for {search_term}")
+            webbrowser.open(f"https://www.google.com/search?q={search_term}")
+        else:
+            respond("What should I search for?")
 
-def check_battery(_=None):
+def check_battery():
     battery = psutil.sensors_battery()
     if battery:
-        speak(f"Battery is at {battery.percent}%")
-        if battery.power_plugged:
-            speak("Charger is plugged in.")
-        else:
-            speak("Charger is not plugged in.")
+        respond(f"Battery is at {battery.percent}%")
+        respond("Your charger is plugged in." if battery.power_plugged else "Your charger is not plugged in.")
     else:
-        speak("Battery info not available.")
+        respond("Battery status is not available.")
 
 def set_timer(query):
     try:
         minutes = int(re.findall(r"\d+", query)[0])
-        speak(f"Setting a timer for {minutes} minutes.")
+        respond(f"Setting a timer for {minutes} minutes.")
         time.sleep(minutes * 60)
-        speak("Time's up!")
-    except:
-        speak("I couldn't set the timer.")
+        respond("Time's up!")
+    except Exception:
+        respond("I couldn't set the timer.")
 
-def report_time(_=None):
+def report_time():
     now = datetime.datetime.now()
-    speak(f"The time is {now.hour} hours and {now.minute} minutes.")
+    respond(f"The time is {now.hour} hours and {now.minute} minutes.")
 
-def handle_help(_=None):
-    help_text = (
-        "You can say things like:\n"
-        "- 'Open YouTube' or 'Open Safari'\n"
-        "- 'Search cats on Google'\n"
-        "- 'Set a timer for 2 minutes'\n"
-        "- 'Check battery'\n"
-        "- 'What time is it?'\n"
-        "- 'Play music' or 'Take a note'\n"
-        "- 'Tell a joke' or 'What's the weather?'\n"
-        "- 'Invoke AI' for conversation\n"
-        "- 'Bye Maggie' to exit"
-    )
-    speak(help_text)
-
-def tell_joke(_=None):
-    jokes = [
-        "Why did the computer go to the doctor? Because it had a virus!",
-        "Why do Java developers wear glasses? Because they don’t C sharp.",
-        "Why did the robot cross the road? Because it was programmed by a chicken!"
-    ]
-    speak(random.choice(jokes))
-
-def tell_weather(_=None):
-    try:
-        res = requests.get("https://wttr.in/?format=3")
-        speak(f"Weather: {res.text}")
-    except:
-        speak("Sorry, couldn't fetch the weather.")
-
-def take_note(_=None):
-    speak("What should I write?")
-    note = take_command()
-    if note:
-        with open("notes.txt", "a") as f:
-            f.write(f"{datetime.datetime.now()}: {note}\n")
-        speak("Note taken.")
-
-def play_music(_=None):
-    music_dir = os.path.expanduser("~/Music")
-    try:
-        songs = [song for song in os.listdir(music_dir) if song.endswith(".mp3")]
-        if songs:
-            song = random.choice(songs)
-            os.system(f"open '{os.path.join(music_dir, song)}'")
-            speak("Playing music")
-        else:
-            speak("No music files found.")
-    except:
-        speak("Music folder not accessible.")
-
-# Routing keywords to functions
-commands = [
-    ("help", handle_help),
-    ("joke", tell_joke),
-    ("weather", tell_weather),
-    ("note", take_note),
-    ("play music", play_music),
-    ("search", google_search),
-    ("set a timer", set_timer),
-    ("battery", check_battery),
-    ("the time", report_time),
-    ("invoke ai", handle_ai_mode)
-]
+def show_help():
+    help_text = """
+    Maggi's Commands:
+    1. 'Open <website name>' - Open a website (e.g., 'Open YouTube').
+    2. 'Open <application name>' - Open a system application (e.g., 'Open Music').
+    3. 'Search <query> on Google' - Search a term on Google.
+    4. 'Set a timer for <minutes>' - Set a timer.
+    5. 'Check battery' - Check battery status.
+    6. 'The time' - Get the current time.
+    7. 'Switch to type mode' - Switch to typing commands instead of speaking.
+    8. 'Switch to voice mode' - Switch to voice commands.
+    9. 'Invoke AI' - Activate the AI mode to interact with LLaMA.
+    10. 'Help' - Show this help message.
+    11. 'Exit' or 'Bye' - Exit the program.
+    """
+    respond(help_text)
 
 if __name__ == "__main__":
-    speak("Hi! I’m Maggie. You can ask me things like 'open YouTube', 'set a timer', or 'check battery'. Say 'help' to hear more.")
-    print("🧠 Maggie is running...")
+    respond("Hello!")
+    choose_mode()
 
     while True:
         query = take_command()
         if not query:
             continue
 
-        if "bye maggie" in query:
-            speak("Goodbye!")
+        if "bye maggi" in query or "exit" in query:
+            respond("Goodbye!")
             break
 
-        # High-priority commands
+        if "invoke ai" in query or "ai mode" in query:
+            handle_ai_mode()
+            continue
+
+        if "switch to type mode" in query:
+            type_mode = True
+            respond("Switched to type mode.")
+            continue
+
+        if "switch to voice mode" in query:
+            type_mode = False
+            respond("Switched to voice mode.")
+            continue
+
+        if "help" in query:
+            show_help()
+            continue
+
         if open_website(query):
             continue
+
         if open_application(query):
             continue
 
-        matched = False
-        for keyword, func in commands:
-            if keyword in query:
-                func(query)
-                matched = True
-                break
+        if "search" in query and "google" in query:
+            google_search(query)
+            continue
 
-        if not matched:
-            speak("Sorry, I didn't understand. Say 'help' to hear what I can do.")
+        if "the time" in query:
+            report_time()
+            continue
+
+        if "set a timer for" in query:
+            set_timer(query)
+            continue
+
+        if "battery" in query:
+            check_battery()
+            continue

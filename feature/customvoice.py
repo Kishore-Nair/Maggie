@@ -1,15 +1,14 @@
 import os
 import pygame
 #used edge-tts
-voice2 = 'en-GB-SoniaNeural'
 voice = 'en-US-AnaNeural'
 def speak(data):
-    command = f'edge-tts --voice "{voice}" --text "{data}" --write-media "data.mp3"'
+    command = f'edge-tts --voice "{voice}" --text "{data}" --write-media "voicedata/data.mp3"'
     os.system(command)
 
     pygame.init()
     pygame.mixer.init()
-    pygame.mixer.music.load("data.mp3")
+    pygame.mixer.music.load("voicedata/data.mp3")
 
     try:
         pygame.mixer.music.play()

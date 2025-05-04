@@ -24,8 +24,6 @@ context = "The user is talking to Maggie, an AI being developed by Kishore. Belo
 
 def handle_convo(query):
     global context  # to persist across calls
-    if "exit lama" in query.lower():
-        return "Exited Llama mode."
 
     result = chain.invoke({"context": context, "question": query})
     context += f"\nUser: {query}\nMaggie: {result}"
