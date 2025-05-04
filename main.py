@@ -1,146 +1,224 @@
 import webbrowser
-#import os
 import speech_recognition as sr
 import datetime
+import subprocess
+import sys
+import time
+import re
+import psutil
+import random
+import os
+import requests
+
 from feature.customvoice import speak
 from feature.llama_for_Maggie import handle_convo
-import time
 
-# def say(text):
-#     os.system(f"say {text}")
-
-def takecommand():
-    r=sr.Recognizer()
+def take_command():
+    r = sr.Recognizer()
     with sr.Microphone() as source:
         r.pause_threshold = 0.6
+        print("🎙️ Listening...")
         audio = r.listen(source)
+
         try:
-            query = r.recognize_google(audio , language='en-in')
-            print(f"user said:{query}\n")
-            print("interpreting...")
+            query = r.recognize_google(audio, language='en-in')
+            print(f"🗣️ User said: {query}")
             return query.lower()
         except sr.UnknownValueError:
-            speak("Sorry, I did not understand what you said. Please try again.")
-            return None
+            speak("Sorry, I didn't catch that.")
         except sr.RequestError as e:
-            speak(f"Could not request results from Google Speech Recognition service; {e}")
-            return None
+            speak(f"Google service error: {e}")
+        return ""
 
+def open_website(query):
+    websites = {
+        "youtube": "https://youtube.com",
+        "google": "https://google.com",
+        "facebook": "https://facebook.com",
+        "twitter": "https://twitter.com",
+        "instagram": "https://instagram.com",
+        "linkedin": "https://linkedin.com",
+        "wikipedia": "https://wikipedia.org",
+        "reddit": "https://reddit.com",
+        "amazon": "https://amazon.com",
+        "netflix": "https://netflix.com",
+        "github": "https://github.com",
+        "stack overflow": "https://stackoverflow.com",
+        "pinterest": "https://pinterest.com",
+        "tiktok": "https://tiktok.com",
+        "quora": "https://quora.com"
+    }
+
+    for name, url in websites.items():
+        if f"open {name}" in query:
+            speak(f"Opening {name}")
+            webbrowser.open(url)
+            return True
+    return False
+
+def open_application(query):
+    apps = {
+        "music": "Music.app",
+        "safari": "Safari.app",
+        "mail": "Mail.app",
+        "photos": "Photos.app",
+        "messages": "Messages.app",
+        "calendar": "Calendar.app",
+        "notes": "Notes.app",
+        "reminders": "Reminders.app",
+        "facetime": "FaceTime.app",
+        "contacts": "Contacts.app",
+        "maps": "Maps.app",
+        "preview": "Preview.app",
+        "finder": "Finder.app",
+        "app store": "App Store.app",
+        "system settings": "System Settings.app"
+    }
+
+    for name, path in apps.items():
+        if f"open {name}" in query:
+            speak(f"Opening {name}")
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            try:
+                subprocess.call([opener, f"/System/Applications/{path}"])
+            except Exception:
+                speak(f"Couldn't open {name}.")
+            return True
+    return False
+
+def handle_ai_mode():
+    speak("Done! How may I help you?")
+    while True:
+        query = take_command()
+        if "exit llama" in query:
+            speak(handle_convo("bye"))
+            break
+        if query:
+            response = handle_convo(query)
+            speak(response)
+
+def google_search(query):
+    search_term = re.sub(r"(search|on google|in google)", "", query).strip()
+    if search_term:
+        speak(f"Searching Google for {search_term}")
+        webbrowser.open(f"https://www.google.com/search?q={search_term}")
+    else:
+        speak("What should I search for?")
+
+def check_battery(_=None):
+    battery = psutil.sensors_battery()
+    if battery:
+        speak(f"Battery is at {battery.percent}%")
+        if battery.power_plugged:
+            speak("Charger is plugged in.")
+        else:
+            speak("Charger is not plugged in.")
+    else:
+        speak("Battery info not available.")
+
+def set_timer(query):
+    try:
+        minutes = int(re.findall(r"\d+", query)[0])
+        speak(f"Setting a timer for {minutes} minutes.")
+        time.sleep(minutes * 60)
+        speak("Time's up!")
+    except:
+        speak("I couldn't set the timer.")
+
+def report_time(_=None):
+    now = datetime.datetime.now()
+    speak(f"The time is {now.hour} hours and {now.minute} minutes.")
+
+def handle_help(_=None):
+    help_text = (
+        "You can say things like:\n"
+        "- 'Open YouTube' or 'Open Safari'\n"
+        "- 'Search cats on Google'\n"
+        "- 'Set a timer for 2 minutes'\n"
+        "- 'Check battery'\n"
+        "- 'What time is it?'\n"
+        "- 'Play music' or 'Take a note'\n"
+        "- 'Tell a joke' or 'What's the weather?'\n"
+        "- 'Invoke AI' for conversation\n"
+        "- 'Bye Maggie' to exit"
+    )
+    speak(help_text)
+
+def tell_joke(_=None):
+    jokes = [
+        "Why did the computer go to the doctor? Because it had a virus!",
+        "Why do Java developers wear glasses? Because they don’t C sharp.",
+        "Why did the robot cross the road? Because it was programmed by a chicken!"
+    ]
+    speak(random.choice(jokes))
+
+def tell_weather(_=None):
+    try:
+        res = requests.get("https://wttr.in/?format=3")
+        speak(f"Weather: {res.text}")
+    except:
+        speak("Sorry, couldn't fetch the weather.")
+
+def take_note(_=None):
+    speak("What should I write?")
+    note = take_command()
+    if note:
+        with open("notes.txt", "a") as f:
+            f.write(f"{datetime.datetime.now()}: {note}\n")
+        speak("Note taken.")
+
+def play_music(_=None):
+    music_dir = os.path.expanduser("~/Music")
+    try:
+        songs = [song for song in os.listdir(music_dir) if song.endswith(".mp3")]
+        if songs:
+            song = random.choice(songs)
+            os.system(f"open '{os.path.join(music_dir, song)}'")
+            speak("Playing music")
+        else:
+            speak("No music files found.")
+    except:
+        speak("Music folder not accessible.")
+
+# Routing keywords to functions
+commands = [
+    ("help", handle_help),
+    ("joke", tell_joke),
+    ("weather", tell_weather),
+    ("note", take_note),
+    ("play music", play_music),
+    ("search", google_search),
+    ("set a timer", set_timer),
+    ("battery", check_battery),
+    ("the time", report_time),
+    ("invoke ai", handle_ai_mode)
+]
 
 if __name__ == "__main__":
-    speak('hello!')
+    speak("Hi! I’m Maggie. You can ask me things like 'open YouTube', 'set a timer', or 'check battery'. Say 'help' to hear more.")
+    print("🧠 Maggie is running...")
+
     while True:
-        print("listening...")
-        query = takecommand()
+        query = take_command()
+        if not query:
+            continue
 
-        if "bye maggi" in query.lower():
-            speak("goodbye!")
-            exit()
+        if "bye maggie" in query:
+            speak("Goodbye!")
+            break
 
+        # High-priority commands
+        if open_website(query):
+            continue
+        if open_application(query):
+            continue
 
-        #AI mode
-        if "Invoke AI".lower() in query.lower():
-            speak("Done! How may I help you?")
-            while True:
-                print("llama listening...")
-                query = takecommand()
-                if  "exit lama" in query:
-                    speak(handle_convo("bye"))
-                    break
+        matched = False
+        for keyword, func in commands:
+            if keyword in query:
+                func(query)
+                matched = True
+                break
 
-                result = handle_convo(query)
-                speak(result)
-
-        #open sites
-        sites = [
-            ["YouTube", "https://youtube.com"],
-            ["Google", "https://google.com"],
-            ["Facebook", "https://facebook.com"],
-            ["Twitter", "https://twitter.com"],
-            ["Instagram", "https://instagram.com"],
-            ["LinkedIn", "https://linkedin.com"],
-            ["Wikipedia", "https://wikipedia.org"],
-            ["Reddit", "https://reddit.com"],
-            ["Amazon", "https://amazon.com"],
-            ["Netflix", "https://netflix.com"],
-            ["GitHub", "https://github.com"],
-            ["Stack Overflow", "https://stackoverflow.com"],
-            ["Pinterest", "https://pinterest.com"],
-            ["TikTok", "https://tiktok.com"],
-            ["Quora", "https://quora.com"]
-        ]
-        for site in sites:
-            if f"Open {site[0]}".lower() in query.lower():
-                speak(f"opening {site[0]}...")
-                webbrowser.open(site[1])
-
-        import re
-        if re.search(r'\bsearch\b', query, re.IGNORECASE) and re.search(r'\bgoogle\b', query, re.IGNORECASE):
-            search_term = query.split("search")[-1].strip().replace("on google", "").replace("in google", "").strip()
-            if search_term:
-                speak(f"Sure! Searching for {search_term} on Google.")
-                webbrowser.open(f"https://www.google.com/search?q={search_term}")
-            else:
-                speak("What would you like to search for?")
-
-        #open apps
-        import subprocess
-        import sys
-        apps = [
-            ["music", "Music.app"],
-            ["safari", "Safari.app"],
-            ["mail", "Mail.app"],
-            ["photos", "Photos.app"],
-            ["messages", "Messages.app"],
-            ["calendar", "Calendar.app"],
-            ["notes", "Notes.app"],
-            ["reminders", "Reminders.app"],
-            ["facetime", "FaceTime.app"],
-            ["contacts", "Contacts.app"],
-            ["maps", "Maps.app"],
-            ["preview", "Preview.app"],
-            ["finder", "Finder.app"],
-            ["app store", "App Store.app"],
-            ["system settings", "System Settings.app"]
-        ]
-
-        for app in apps:
-            if f"open {app[0].lower()}" in query.lower():
-                speak(f"sure!, opening {app[0]}...")
-                opener = "open" if sys.platform == "darwin" else "xdg-open"
-                try:
-                    subprocess.call([opener, f"/System/Applications/{app[1]}"])
-                except Exception as e:
-                    print(f"Failed to open {app[1]}: {e}")
-
-
-        #time
-        if "the time" in query:
-            hour = datetime.datetime.now().strftime("%H")
-            mins = datetime.datetime.now().strftime("%M")
-            speak(f"the time is {hour} hours and {mins} minutes")
-        if "set a timer for" in query:
-            try:
-                timer_duration = int(query.split("set a timer for")[-1].split("minutes")[0].strip())
-                speak(f"Timer set for {timer_duration} minutes.")
-                time.sleep(timer_duration * 60)
-                speak("Time's up!")
-            except Exception as e:
-                speak(f"Sorry, I couldn't set the timer. {str(e)}")
-
-        #battery
-        import psutil
-        def check_battery():
-            battery = psutil.sensors_battery()
-            percent = battery.percent
-            speak(f"Your battery is at {percent}%")
-            if not battery.power_plugged:
-                speak("Your charger is not plugged in.")
-            else:
-                speak("Your charger is plugged in.")
-
-
-        if "battery" in query:
-            check_battery()
-
-        
+        if not matched:
+            speak("Sorry, I didn't understand. Say 'help' to hear what I can do.")

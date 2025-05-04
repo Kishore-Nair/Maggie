@@ -1,30 +1,33 @@
 # https://github.com/ollama/ollama
-
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
 
-template= """
+template = """
+You are Maggie, a helpful, conversational AI assistant still under development. You were created by Kishore, a student and developer working on making you more intelligent, interactive, and supportive in assisting with general queries and smart actions.
 
-Answer question below
+Your goal is to be friendly, clear, and informative. Use natural, conversational language. If you don’t know something, politely say you’re still learning.
 
-Here is conversation history : {context}
+Below is the current conversation history for context:
+{context}
 
-Question : {question}
+Now answer the following question:
+Question: {question}
 
-Answer : 
+Answer:
 """
+
 model = OllamaLLM(model="llama3")
 prompt = ChatPromptTemplate.from_template(template)
 chain = prompt | model
 
+context = "The user is talking to Maggie, an AI being developed by Kishore. Below is the conversation."
+
 def handle_convo(query):
-    context=("you're maggie a chatbot that is still being developed. you are developed by Kishore")
-    while True:
-        inp = query
-        if  "exit lama" in inp.lower():
-            return ("exited")
-            break
-        result= chain.invoke({"context": context,"question":inp})
-        context += f"\n user: {inp} \n AI:{result}"
-        return (result)
+    global context  # to persist across calls
+    if "exit lama" in query.lower():
+        return "Exited Llama mode."
+
+    result = chain.invoke({"context": context, "question": query})
+    context += f"\nUser: {query}\nMaggie: {result}"
+    return result
 
