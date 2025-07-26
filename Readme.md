@@ -41,7 +41,7 @@ To run this project, you need the following:
 1.  Clone this repository:
 
     ```bash
-    git clone [https://github.com/yourusername/maggi-assistant.git]
+    git clone https://github.com/Kishore-Nair/Maggie.git
     ```
 
 2.  Navigate to the project directory:
@@ -59,6 +59,7 @@ To run this project, you need the following:
 ## Running the Assistant
 
 Before running Maggi, ensure that Ollama is running in the background, as the AI mode relies on it.
+Download ollama from: [Ollama]({https://ollama.com/}) 
 
 **Starting Ollama:**
 
