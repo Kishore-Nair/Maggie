@@ -59,7 +59,7 @@ To run this project, you need the following:
 ## Running the Assistant
 
 Before running Maggi, ensure that Ollama is running in the background, as the AI mode relies on it.
-Download ollama from: [Ollama]({https://ollama.com/}) 
+Download ollama from: <https://ollama.com/>
 
 **Starting Ollama:**
 
